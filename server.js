@@ -147,18 +147,45 @@ app.post(`/create-a-db-record`, (req, res) => {
  * This router handles GET requests to
  * http://localhost:3000/update-a-db-record/
  */
-app.get(`/update-a-db-record`, (req, res) => {
-    db.collection(dbCollection).find().toArray((err, arrayObject) => {
-        if (err) {
-            return console.log(err);
-        } else {
-            console.log(`User requested the resource ` +
-                `http://${HOST}:${port}/update-a-db-record`);
+app.post(`/update-a-db-record`, (req, res) => {
+    const name = (req.body.name || "").trim();
+    const password = (req.body.password || "").trim();
 
-            res.render(`update-a-record-in-database.njk`,
-                {mongoDBArray: arrayObject});
+    if (!name || name.toLowerCase().includes(`select`)) {
+        console.log(colors.red, `UPDATE failed: no user selected`, colors.reset);
+        return res.redirect(`/update-a-db-record`);
+    }
+
+    if (!password) {
+        console.log(colors.red, `UPDATE failed: empty password`, colors.reset);
+        return res.redirect(`/update-a-db-record`);
+    }
+
+    db.collection(dbCollection).findOneAndUpdate(
+        { name: name },
+        { $set: { password: password } },
+        { returnDocument: "after" },
+        (err, result) => {
+            if (err) return console.log(err);
+
+            if (result.value) {
+                console.log(
+                    colors.green,
+                    `UPDATED user password:`,
+                    colors.reset,
+                    `name="${result.value.name}", _id=${result.value._id}`
+                );
+            } else {
+                console.log(
+                    colors.yellow,
+                    `UPDATE: no record found for name="${name}"`,
+                    colors.reset
+                );
+            }
+
+            res.redirect(`/read-a-db-record`);
         }
-    });
+    );
 });
 
 /*
@@ -167,7 +194,43 @@ app.get(`/update-a-db-record`, (req, res) => {
  */
 app.get(`/delete-a-db-record`, (req, res) => {
     db.collection(dbCollection).find().toArray((err, arrayObject) => {
-        res.render(`delete-a-record-in-database.njk`,
-            {mongoDBArray: arrayObject});
+        if (err) return console.log(err);
+        res.render(`delete-a-record-in-database.njk`, {
+            mongoDBArray: arrayObject
+        });
     });
+});
+
+/* DELETE (POST) — deletes by NAME */
+app.post(`/delete-a-db-record`, (req, res) => {
+    const name = (req.body.name || "").trim();
+
+    if (!name || name.toLowerCase().includes(`select`)) {
+        console.log(colors.red, `DELETE failed: no user selected`, colors.reset);
+        return res.redirect(`/delete-a-db-record`);
+    }
+
+    db.collection(dbCollection).findOneAndDelete(
+        { name: name },
+        (err, result) => {
+            if (err) return console.log(err);
+
+            if (result.value) {
+                console.log(
+                    colors.green,
+                    `DELETED user:`,
+                    colors.reset,
+                    `name="${result.value.name}", _id=${result.value._id}`
+                );
+            } else {
+                console.log(
+                    colors.yellow,
+                    `DELETE: no record found for name="${name}"`,
+                    colors.reset
+                );
+            }
+
+            res.redirect(`/read-a-db-record`);
+        }
+    );
 });
